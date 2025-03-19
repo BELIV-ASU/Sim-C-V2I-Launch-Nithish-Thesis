@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<launch>
+    <arg name="carom_object_tracker_input" default="/perception/object_recognition/detection/carom_frame_transformed/objects" description="input topic name"/>
+    <arg name="carom_object_tracker_output" default="/perception/object_recognition/tracking/carom/objects" description="output topic name"/>
+
+    <arg name="carom_object_predictor_input" default="/perception/object_recognition/tracking/carom/objects" description="input topic name"/>
+    <arg name="carom_object_predictor_output" default="/perception/object_recognition/prediction/path/carom/objects" description="output topic name"/>
+    <arg name="carom_object_predictor_param_path" default="/home/nithish/autoware/src/universe/autoware.universe/perception/map_based_prediction/config/map_based_prediction_carom_res_896x504.param.yaml" description="modified prediction param path for delay compensation"/>
+
+    <arg name="lidar_centerpoint_input" default="/sensing/lidar/concatenated/rate_downsampled/pointcloud" description="input topic name"/>
+    <arg name="lidar_centerpoint_output" default="/perception/object_recognition/detection/centerpoint/objects" description="output topic name"/>
+    <arg name="lidar_centerpoint_model_name" default="centerpoint_tiny" description="model name of the lidar centerpoint algorithm"/>
+    <arg name="lidar_centerpoint_model_config_path" default="/home/nithish/autoware/src/universe/autoware.universe/perception/lidar_centerpoint/config/centerpoint_tiny_modified_for_sim_c_v2i.param.yaml" description="modified config file for sim_c_v2i"/>
+
+    <arg name="fused_object_tracker_input" default="/perception/object_recognition/detection/onboard_infrastructure_fused_objects" description="input topic name"/>
+    <arg name="fused_object_tracker_output" default="/perception/object_recognition/tracking/onboard_infrastructure_fused_objects" description="output topic name"/>
+
+    <arg name="fused_object_predictor_input" default="/perception/object_recognition/tracking/onboard_infrastructure_fused_objects" description="input topic name"/>
+    <arg name="fused_object_predictor_output" default="/perception/object_recognition/prediction/onboard_infrastructure_fused_objects" description="output topic name"/>
+    <arg name="fused_object_predictor_param_path" default="/home/nithish/autoware/src/universe/autoware.universe/perception/map_based_prediction/config/map_based_prediction.param.yaml" description="param path for prediction for downstream pipeline"/>
+
+    <node pkg="tf2_ros" exec="static_transform_publisher" output="screen" args="-47.25 0.1 0.0 -1.57 0.0 0.0 map camera_infrastructure_local_frame"/>
+
+    <node pkg="tf2_ros" exec="static_transform_publisher" output="screen" args="-61.1 -37.26 2.0 0.0 0.0 0.0 map rsu_frame"/>
+
+    <node pkg="carom" name="carom_tracker" exec="tracking_version3" output="screen"/>
+
+    <node pkg="marker_visualization" name="rsu_range_visualization_marker_node" exec="rsu_range_marker" output="screen"/>
+    
+    <node pkg="infrastructure_objects_frame_transformation" name="carom_objects_frame_transformer" exec="objects_frame_transformation_version3" output="screen"/>
+    
+    <include file="$(find-pkg-share multi_object_tracker)/launch/multi_object_tracker.launch.xml">
+		  <arg name="input" value="$(var carom_object_tracker_input)"/>
+		  <arg name="output" value="$(var carom_object_tracker_output)"/>
+	  </include>
+
+    <include file="$(find-pkg-share map_based_prediction)/launch/map_based_prediction.launch.xml">
+      <arg name="input_topic" value="$(var carom_object_predictor_input)"/>
+      <arg name="output_topic" value="$(var carom_object_predictor_output)"/>
+      <arg name="param_path" value="$(var carom_object_predictor_param_path)"/>
+    </include>
+    
+    
+    <node pkg="infrastructure_objects_delay_compensation" name="delay_compensation_point_picker_and_output_regulator_version2" exec="object_delay_compensator_and_output_regulator_version2" output="screen"/>
+  
+
+    <include file="$(find-pkg-share lidar_centerpoint)/launch/lidar_centerpoint.launch.xml">
+      <arg name="input/pointcloud" value="$(var lidar_centerpoint_input)"/>
+      <arg name="output/objects" value="$(var lidar_centerpoint_output)"/>
+      <arg name="model_name" value="$(var lidar_centerpoint_model_name)"/>
+      <arg name="model_param_path" value="$(var lidar_centerpoint_model_config_path)"/>
+    </include>
+
+    
+    <node pkg="euclidean_object_merger" name="IoU_based_object_merger" exec="object_merger_method2_version2" output="screen"/>
+
+    <include file="$(find-pkg-share multi_object_tracker)/launch/multi_object_tracker.launch.xml">
+		  <arg name="input" value="$(var fused_object_tracker_input)"/>
+		  <arg name="output" value="$(var fused_object_tracker_output)"/>
+	  </include>
+
+    <include file="$(find-pkg-share map_based_prediction)/launch/map_based_prediction.launch.xml">
+      <arg name="input_topic" value="$(var fused_object_predictor_input)"/>
+      <arg name="output_topic" value="$(var fused_object_predictor_output)"/>
+      <arg name="param_path" value="$(var fused_object_predictor_param_path)"/>
+    </include>
+    
+
+</launch>
